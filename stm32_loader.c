@@ -30,6 +30,7 @@
 #include <libopencm3/stm32/iwdg.h>
 #include <libopencm3/cm3/scb.h>
 #include "hwdefs.h"
+#include "stm32_loader.h"
 
 #define PAGE_SIZE 1024
 #define PAGE_WORDS (PAGE_SIZE / 4)
@@ -47,6 +48,8 @@ static void clock_setup(void)
    /* Enable all needed GPIOx clocks */
    rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_IOPAEN);
    rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_IOPBEN);
+   rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_IOPCEN);
+   rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_IOPDEN);
 
    #ifdef HWCONFIG_OLIMEX
    rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_USART3EN);
@@ -102,6 +105,28 @@ static void dma_setup(void *data, uint32_t len)
    dma_clear_interrupt_flags(DMA1, USART_DMA_CHAN, DMA_TCIF);
 }
 
+static void initialize_pins()
+{
+   const struct pincommands* pincommands = (struct pincommands*)PINDEF_ADDRESS;
+
+   uint32_t crc = crc_calculate_block(((uint32_t*)pincommands), PINDEF_NUMWORDS);
+
+   if (crc == pincommands->crc)
+   {
+      for (int idx = 0; idx < NUM_PIN_COMMANDS && pincommands->pindef[idx].port > 0; idx++)
+      {
+         uint8_t cnf = pincommands->pindef[idx].inout ? GPIO_CNF_OUTPUT_PUSHPULL : GPIO_CNF_INPUT_PULL_UPDOWN;
+         uint8_t mode = pincommands->pindef[idx].inout ? GPIO_MODE_OUTPUT_50_MHZ : GPIO_MODE_INPUT;
+         gpio_set_mode(pincommands->pindef[idx].port, mode, cnf, pincommands->pindef[idx].pin);
+
+         if (pincommands->pindef[idx].level)
+         {
+            gpio_set(pincommands->pindef[idx].port, pincommands->pindef[idx].pin);
+         }
+      }
+   }
+}
+
 static void write_flash(uint32_t addr, uint32_t *pageBuffer)
 {
    flash_erase_page(addr);
@@ -123,6 +148,7 @@ int main(void)
    uint32_t addr = APP_FLASH_START;
 
    clock_setup();
+   initialize_pins();
    usart_setup();
    dma_setup(page_buffer, PAGE_SIZE);
 
