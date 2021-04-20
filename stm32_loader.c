@@ -32,8 +32,6 @@
 #include "hwdefs.h"
 #include "stm32_loader.h"
 
-#define PAGE_SIZE 1024
-#define PAGE_WORDS (PAGE_SIZE / 4)
 #define FLASH_START 0x08000000
 #define APP_FLASH_START 0x08001000
 #define BOOTLOADER_MAGIC 0xAA
@@ -55,9 +53,9 @@ static void clock_setup(void)
    rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_USART3EN);
    #endif
    #ifdef HWCONFIG_OLIMEX_H107
-   rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_USART2EN);
-   rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_AFIOEN);
-   gpio_primary_remap(AFIO_MAPR_SWJ_CFG_FULL_SWJ, AFIO_MAPR_USART2_REMAP);
+   rcc_periph_clock_enable(RCC_AFIO);
+   rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_USART3EN);
+   gpio_primary_remap(AFIO_MAPR_SWJ_CFG_JTAG_OFF_SW_ON, AFIO_MAPR_USART3_REMAP_FULL_REMAP);
    #endif
    #ifdef HWCONFIG_TUMANAKO_KIWIAC
    rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_USART1EN);
@@ -127,11 +125,11 @@ static void initialize_pins()
    }
 }
 
-static void write_flash(uint32_t addr, uint32_t *pageBuffer)
+static void write_flash(uint32_t addr, uint32_t *pageBuffer, uint32_t pageWords)
 {
    flash_erase_page(addr);
 
-   for (int idx = 0; idx < PAGE_WORDS; idx++)
+   for (uint32_t idx = 0; idx < pageWords; idx++)
    {
       flash_program_word(addr + idx * 4, pageBuffer[idx]);
    }
@@ -144,13 +142,19 @@ void wait(void)
 
 int main(void)
 {
-   uint32_t page_buffer[PAGE_WORDS];
+   //medium density devices have 1k page size, high density and connectivity line have 2k page size
+   const uint32_t pageSize = (((MMIO32(DBGMCU_BASE) & 0x7FF) == 0x410) ? 1024 : 2048);
+   const uint32_t pageWords = pageSize / 4;
+   const uint32_t receiveSize = 1024;
+   const uint32_t receiveWords = receiveSize / 4;
+   uint32_t page_buffer[pageWords];
    uint32_t addr = APP_FLASH_START;
+   uint32_t bufferOffset= 0;
 
    clock_setup();
    initialize_pins();
    usart_setup();
-   dma_setup(page_buffer, PAGE_SIZE);
+   //dma_setup(page_buffer, receiveSize);
 
    wait();
    usart_send_blocking(TERM_USART, '2');
@@ -170,7 +174,7 @@ int main(void)
          uint32_t timeOut = DELAY_200;
 
          crc_reset();
-         dma_setup(page_buffer, PAGE_SIZE);
+         dma_setup(page_buffer + bufferOffset, receiveSize);
          usart_send_blocking(TERM_USART, 'P');
 
          while (!dma_get_interrupt_flag(DMA1, USART_DMA_CHAN, DMA_TCIF))
@@ -182,13 +186,13 @@ int main(void)
             if (0 == timeOut)
             {
                timeOut = DELAY_200;
-               dma_setup(page_buffer, PAGE_SIZE);
+               dma_setup(page_buffer + bufferOffset, receiveSize);
                usart_send_blocking(TERM_USART, 'T');
             }
             iwdg_reset();
          }
 
-         uint32_t crc = crc_calculate_block(page_buffer, PAGE_WORDS);
+         uint32_t crc = crc_calculate_block(page_buffer + bufferOffset, receiveWords);
 
          dma_setup(&recvCrc, sizeof(recvCrc));
          usart_send_blocking(TERM_USART, 'C');
@@ -196,9 +200,24 @@ int main(void)
 
          if (crc == recvCrc)
          {
-            write_flash(addr, page_buffer);
+            /* Write to flash when we have sufficient amount of data or last page was received */
+            if (receiveWords == pageWords || (bufferOffset + receiveWords) == pageWords || numPages == 1)
+            {
+               write_flash(addr, page_buffer, pageWords);
+               addr += pageSize;
+            }
+
+            if (receiveWords < pageWords)
+            {
+               bufferOffset = bufferOffset + receiveWords;
+
+               if ((bufferOffset + receiveWords) > pageWords)
+               {
+                  bufferOffset = 0;
+               }
+            }
+
             numPages--;
-            addr += PAGE_SIZE;
          }
          else
          {
