@@ -149,12 +149,12 @@ int main(void)
    const uint32_t receiveWords = receiveSize / 4;
    uint32_t page_buffer[pageWords];
    uint32_t addr = APP_FLASH_START;
-   uint32_t bufferOffset= 0;
+   uint32_t bufferOffset = 0;
 
    clock_setup();
    initialize_pins();
    usart_setup();
-   //dma_setup(page_buffer, receiveSize);
+   dma_setup(page_buffer, receiveSize);
 
    wait();
    usart_send_blocking(TERM_USART, '2');
