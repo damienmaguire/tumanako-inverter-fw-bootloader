@@ -1,7 +1,13 @@
 proc program_device () {
+    source configfile.openocd
     reset halt
     flash write_image erase unlock stm32_loader.hex
-    flash write_image erase unlock stm32_sineHWCONFIG_REV2.hex
+    flash write_image erase unlock stm32_$APP.hex
+
+    if { [info exists CONFIGFILE] } {
+        flash write_image erase unlock $CONFIGFILE 0x0801F800
+    } 
+    
     reset run
     sleep 1
     shutdown

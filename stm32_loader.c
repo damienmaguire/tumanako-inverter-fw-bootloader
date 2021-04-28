@@ -25,6 +25,7 @@
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/usart.h>
 #include <libopencm3/stm32/flash.h>
+#include <libopencm3/stm32/desig.h>
 #include <libopencm3/stm32/dma.h>
 #include <libopencm3/stm32/crc.h>
 #include <libopencm3/stm32/iwdg.h>
@@ -33,6 +34,8 @@
 #include "stm32_loader.h"
 
 #define FLASH_START 0x08000000
+#define SMALLEST_PAGE_WORDS 256
+#define PROGRAM_WORDS       512
 #define APP_FLASH_START 0x08001000
 #define BOOTLOADER_MAGIC 0xAA
 #define DELAY_100 (1 << 20)
@@ -90,12 +93,16 @@ static void usart_setup(void)
     usart_enable(TERM_USART);
 }
 
+/** @brief setup DMA for serial reception
+ * @param data data buffer
+ * @param len length of data buffer in 32-bit words
+ */
 static void dma_setup(void *data, uint32_t len)
 {
    dma_disable_channel(DMA1, USART_DMA_CHAN);
    dma_set_peripheral_address(DMA1, USART_DMA_CHAN, (uint32_t)&USART3_DR);
    dma_set_memory_address(DMA1, USART_DMA_CHAN, (uint32_t)data);
-   dma_set_number_of_data(DMA1, USART_DMA_CHAN, len);
+   dma_set_number_of_data(DMA1, USART_DMA_CHAN, len * 4);
    dma_set_peripheral_size(DMA1, USART_DMA_CHAN, DMA_CCR_PSIZE_8BIT);
    dma_set_memory_size(DMA1, USART_DMA_CHAN, DMA_CCR_MSIZE_8BIT);
    dma_enable_memory_increment_mode(DMA1, USART_DMA_CHAN);
@@ -125,11 +132,27 @@ static void initialize_pins()
    }
 }
 
-static void write_flash(uint32_t addr, uint32_t *pageBuffer, uint32_t pageWords)
+//Check 1k of flash whether it contains only 0xFF = erased
+static bool check_erased(uint32_t* baseAddress)
+{
+   uint32_t check = 0xFFFFFFFF;
+
+   for (int i = 0; i < SMALLEST_PAGE_WORDS; i++, baseAddress++)
+      check &= *baseAddress;
+
+   return check == 0xFFFFFFFF;
+}
+
+//We always write 2kb pages. After erasing the possible first page we check the
+//data content of the possible second page. If it is not erased, it will be.
+static void write_flash(uint32_t addr, uint32_t *pageBuffer)
 {
    flash_erase_page(addr);
 
-   for (uint32_t idx = 0; idx < pageWords; idx++)
+   if (!check_erased(((uint32_t*)addr) + SMALLEST_PAGE_WORDS))
+      flash_erase_page(addr + SMALLEST_PAGE_WORDS * 4);
+
+   for (uint32_t idx = 0; idx < PROGRAM_WORDS; idx++)
    {
       flash_program_word(addr + idx * 4, pageBuffer[idx]);
    }
@@ -142,19 +165,15 @@ void wait(void)
 
 int main(void)
 {
-   //medium density devices have 1k page size, high density and connectivity line have 2k page size
-   const uint32_t pageSize = (((MMIO32(DBGMCU_BASE) & 0x7FF) == 0x410) ? 1024 : 2048);
-   const uint32_t pageWords = pageSize / 4;
-   const uint32_t receiveSize = 1024;
-   const uint32_t receiveWords = receiveSize / 4;
-   uint32_t page_buffer[pageWords];
+   const uint32_t receiveWords = SMALLEST_PAGE_WORDS;
+   uint32_t page_buffer[PROGRAM_WORDS];
    uint32_t addr = APP_FLASH_START;
    uint32_t bufferOffset = 0;
 
    clock_setup();
    initialize_pins();
    usart_setup();
-   dma_setup(page_buffer, receiveSize);
+   dma_setup(page_buffer, receiveWords);
 
    wait();
    usart_send_blocking(TERM_USART, '2');
@@ -174,7 +193,7 @@ int main(void)
          uint32_t timeOut = DELAY_200;
 
          crc_reset();
-         dma_setup(page_buffer + bufferOffset, receiveSize);
+         dma_setup(page_buffer + bufferOffset, receiveWords);
          usart_send_blocking(TERM_USART, 'P');
 
          while (!dma_get_interrupt_flag(DMA1, USART_DMA_CHAN, DMA_TCIF))
@@ -186,7 +205,7 @@ int main(void)
             if (0 == timeOut)
             {
                timeOut = DELAY_200;
-               dma_setup(page_buffer + bufferOffset, receiveSize);
+               dma_setup(page_buffer + bufferOffset, receiveWords);
                usart_send_blocking(TERM_USART, 'T');
             }
             iwdg_reset();
@@ -194,27 +213,22 @@ int main(void)
 
          uint32_t crc = crc_calculate_block(page_buffer + bufferOffset, receiveWords);
 
-         dma_setup(&recvCrc, sizeof(recvCrc));
+         dma_setup(&recvCrc, 1);
          usart_send_blocking(TERM_USART, 'C');
          while (!dma_get_interrupt_flag(DMA1, USART_DMA_CHAN, DMA_TCIF));
 
          if (crc == recvCrc)
          {
             /* Write to flash when we have sufficient amount of data or last page was received */
-            if (receiveWords == pageWords || (bufferOffset + receiveWords) == pageWords || numPages == 1)
+            if (bufferOffset == receiveWords || numPages == 1)
             {
-               write_flash(addr, page_buffer, pageWords);
-               addr += pageSize;
+               write_flash(addr, page_buffer);
+               addr += sizeof(page_buffer);
+               bufferOffset = 0;
             }
-
-            if (receiveWords < pageWords)
+            else
             {
-               bufferOffset = bufferOffset + receiveWords;
-
-               if ((bufferOffset + receiveWords) > pageWords)
-               {
-                  bufferOffset = 0;
-               }
+               bufferOffset += receiveWords;
             }
 
             numPages--;
