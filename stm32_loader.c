@@ -112,7 +112,9 @@ static void dma_setup(void *data, uint32_t len)
 
 static void initialize_pins()
 {
-   const struct pincommands* pincommands = (struct pincommands*)PINDEF_ADDRESS;
+   uint32_t flashSize = desig_get_flash_size();
+   uint32_t pindefAddr = FLASH_BASE + flashSize * 1024 - PINDEF_BLKNUM * PINDEF_BLKSIZE;
+   const struct pincommands* pincommands = (struct pincommands*)pindefAddr;
 
    uint32_t crc = crc_calculate_block(((uint32_t*)pincommands), PINDEF_NUMWORDS);
 
