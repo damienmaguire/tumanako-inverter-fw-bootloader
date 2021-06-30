@@ -14,12 +14,12 @@
 #endif
 
 #ifdef HWCONFIG_OLIMEX
-#define RCC_CLOCK_SETUP rcc_clock_setup_in_hse_8mhz_out_72mhz
+#define RCC_CLOCK_SETUP() rcc_clock_setup_pll(&rcc_hse_8mhz_3v3[RCC_CLOCK_3V3_168MHZ])
 
 #define TERM_USART USART3
-#define TERM_USART_TXPIN GPIO_USART3_TX
+#define TERM_USART_TXPIN  GPIO10 | GPIO11
 #define TERM_USART_TXPORT GPIOB
-#define USART_DMA_CHAN 3
+#define USART_DMA_CHAN    DMA_STREAM1
 #endif
 
 #ifdef HWCONFIG_OLIMEX_H107

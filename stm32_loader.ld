@@ -17,13 +17,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Linker script for Olimex STM32-H103 (STM32F103RBT6, 128K flash, 20K RAM). */
+/* Linker script for Olimex STM32-H405 (STM32F405RGT6, 1024K flash, 64K RAM). */
 
 /* Define memory regions. */
 MEMORY
 {
-	rom (rx)    : ORIGIN = 0x08000000, LENGTH = 4K
-	ram (rwx)   : ORIGIN = 0x20000000, LENGTH = 20K
+	rom (rx)    : ORIGIN = 0x08000000, LENGTH = 16K
+	ram (rwx)   : ORIGIN = 0x20000000, LENGTH = 64K
 }
 
 

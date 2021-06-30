@@ -29,9 +29,10 @@ OBJCOPY		= $(PREFIX)-objcopy
 OBJDUMP		= $(PREFIX)-objdump
 TOOLCHAIN_DIR = `dirname \`which $(CC)\``/../$(PREFIX)
 CFLAGS		= -Os -Wall -Wextra -Ilibopencm3/include -fno-common -fno-builtin \
-		  -mcpu=cortex-m3 -mthumb -std=gnu99 -ffunction-sections -fdata-sections
+		  -mcpu=cortex-m4 -mthumb -std=gnu99 -ffunction-sections -fdata-sections \
+		  -mfloat-abi=hard -mfpu=fpv4-sp-d16
 CPPFLAGS    = -Os -Wall -Wextra -Ilibopencm3/include -fno-common \
-		 -ffunction-sections -fdata-sections -fno-builtin -fno-rtti -fno-exceptions -fno-unwind-tables -mcpu=cortex-m3 -mthumb
+		 -ffunction-sections -fdata-sections -fno-builtin -fno-rtti -fno-exceptions -fno-unwind-tables -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16
 LDSCRIPT	= $(BINARY).ld
 LDFLAGS         = -Llibopencm3/lib -T$(LDSCRIPT) -nostartfiles -Wl,--gc-sections,-Map,linker.map
 OBJS		= $(BINARY).o
@@ -61,7 +62,7 @@ images: $(BINARY)
 
 $(BINARY): $(OBJS) $(LDSCRIPT)
 	@printf "  LD      $(subst $(shell pwd)/,,$(@))\n"
-	$(Q)$(LD) $(LDFLAGS) -o $(BINARY) $(OBJS) -lopencm3_stm32f1
+	$(Q)$(LD) $(LDFLAGS) -o $(BINARY) $(OBJS) -lopencm3_stm32f4
 
 %.o: %.c Makefile
 	@printf "  CC      $(subst $(shell pwd)/,,$(@))\n"
