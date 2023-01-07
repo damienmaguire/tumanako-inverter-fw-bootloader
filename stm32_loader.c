@@ -55,6 +55,9 @@ static void clock_setup(void)
    #ifdef HWCONFIG_OLIMEX
    rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_USART3EN);
    #endif
+   #ifdef HWCONFIG_LOGGER
+   rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_USART2EN);
+   #endif
    #ifdef HWCONFIG_OLIMEX_H107
    rcc_periph_clock_enable(RCC_AFIO);
    rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_USART3EN);
@@ -100,7 +103,7 @@ static void usart_setup(void)
 static void dma_setup(void *data, uint32_t len)
 {
    dma_disable_channel(DMA1, USART_DMA_CHAN);
-   dma_set_peripheral_address(DMA1, USART_DMA_CHAN, (uint32_t)&USART3_DR);
+   dma_set_peripheral_address(DMA1, USART_DMA_CHAN, (uint32_t)&USART2_DR);
    dma_set_memory_address(DMA1, USART_DMA_CHAN, (uint32_t)data);
    dma_set_number_of_data(DMA1, USART_DMA_CHAN, len * 4);
    dma_set_peripheral_size(DMA1, USART_DMA_CHAN, DMA_CCR_PSIZE_8BIT);
