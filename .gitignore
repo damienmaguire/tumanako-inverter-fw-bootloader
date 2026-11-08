@@ -1,0 +1,9 @@
+*.o
+*.hex
+*.bin
+*.map
+stm32_loader
+stm32_loader_f407
+bootupdater/stm32_bootupdater
+bootupdater/stm32_bootupdater_f407
+libopencm3/

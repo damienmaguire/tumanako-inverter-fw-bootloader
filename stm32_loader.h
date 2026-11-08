@@ -21,8 +21,35 @@
 
 #include <stdint.h>
 
+/*
+ * Pin-definition block read by the bootloader before it starts the
+ * application. The struct layout matches libopeninv.
+ *
+ * On STM32F1 the store is PINDEF_BLKNUM pages down from the end of
+ * flash. PINDEF_BLKSIZE is 1 KiB on the original boards.
+ *
+ * STM32F4 flash is erased a sector at a time. Counting back from the
+ * end of the device can put this store in the same sector as the
+ * firmware or another saved block. The F4 build defines PINDEF_ADDRESS
+ * and PINDEF_SECTOR before including this header, and it only reads
+ * that sector. An application update must not erase it.
+ */
+#ifndef PINDEF_BLKNUM
 #define PINDEF_BLKNUM    3  //3rd to last flash page
+#endif
+#ifndef PINDEF_BLKSIZE
 #define PINDEF_BLKSIZE   1024
+#endif
+
+#if defined(STM32F4)
+#ifndef PINDEF_ADDRESS
+#error STM32F4: define PINDEF_ADDRESS before including stm32_loader.h
+#endif
+#ifndef PINDEF_SECTOR
+#error STM32F4: define PINDEF_SECTOR before including stm32_loader.h
+#endif
+#endif
+
 #define NUM_PIN_COMMANDS 10
 #define PIN_IN 0
 #define PIN_OUT 1

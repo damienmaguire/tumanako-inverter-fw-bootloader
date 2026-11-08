@@ -1,7 +1,8 @@
 #!/bin/bash
-
-git clone https://github.com/jsphuebner/libopencm3.git
-
-cd libopencm3
-make
-
+# Johannes's libopencm3 fork. F1 is the existing bootloader, F4 is the
+# STM32F407 VCU bootloader. Other libopencm3 targets are not required.
+set -e
+if [ ! -d libopencm3/.git ]; then
+  git clone https://github.com/jsphuebner/libopencm3.git
+fi
+make -C libopencm3 TARGETS="stm32/f1 stm32/f4"
