@@ -3,7 +3,9 @@ install: make get-deps
 
 script:
   - make
-  - cd bootupdater && make
+  - make f4
+  - make -C bootupdater
+  - make -C bootupdater f4
 
 addons:
   apt:
