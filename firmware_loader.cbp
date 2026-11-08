@@ -29,6 +29,20 @@
 					<SilentBuild command="$make -s -f $makefile" />
 				</MakeCommands>
 			</Target>
+			<Target title="STM32F407">
+				<Option output="stm32_loader_f407" prefix_auto="0" extension_auto="0" />
+				<Option object_output="obj-f4/" />
+				<Option type="1" />
+				<Option compiler="armelfgcc" />
+				<MakeCommands>
+					<Build command="make f4" />
+					<CompileFile command="$make -f  $file" />
+					<Clean command="make clean" />
+					<DistClean command="$make -f $makefile distclean$target" />
+					<AskRebuildNeeded command="$make -q -f $makefile" />
+					<SilentBuild command="$make -s -f $makefile f4" />
+				</MakeCommands>
+			</Target>
 		</Build>
 		<Unit filename="Makefile" />
 		<Unit filename="hwdefs.h" />
@@ -36,10 +50,14 @@
 			<Option compilerVar="CC" />
 		</Unit>
 		<Unit filename="stm32_loader.ld" />
+		<Unit filename="stm32_loader_f407.ld" />
 		<Extensions>
 			<debugger>
 				<search_path add="/home/johu/Projekte/e-umbau/firmware/tumanako-inverter-fw-bootloader/" />
 				<remote_debugging target="Release">
+					<options conn_type="0" ip_address="localhost" ip_port="3333" additional_cmds="load&#x0A;r" />
+				</remote_debugging>
+				<remote_debugging target="STM32F407">
 					<options conn_type="0" ip_address="localhost" ip_port="3333" additional_cmds="load&#x0A;r" />
 				</remote_debugging>
 			</debugger>
